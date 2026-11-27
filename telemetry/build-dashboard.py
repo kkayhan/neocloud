@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Build telemetry/grafana/neocloud-topology.json: the neocloud CSP datacenter as ONE live flow panel.
+Build telemetry/grafana/neocloud-topology.json: the NeoCloud datacenter as ONE live flow panel.
 
 Owner 2026-11-02: "build a grafana dashboard, i only want the topology svg, no need for other stuff.
 similar to what we have for aifabric". House style (telemetry-stack §0): white canvas, draw.io device
@@ -391,7 +391,7 @@ for ew in EW_SPINES:
         cells.append((f"ews:{ew}:{d}", f"ews:{ew}:{d}", "rate"))
 
 # title + legend
-deco = [text(24, 34, "neocloud CSP datacenter — live traffic", size=21, anchor="start", weight="700"),
+deco = [text(24, 34, "NeoCloud datacenter — live traffic", size=21, anchor="start", weight="700"),
         text(24, 55, "28 × SR Linux 26.7.1 (7220 IXR-H5-64O-512 / D5, 7250 IXR-X1B) · DC1 frontend + GPU backend · "
                      "DC2 over DCI · internet edge", size=12, fill=MUTED, weight="500", anchor="start")]
 lx, ly = 24, H - 20

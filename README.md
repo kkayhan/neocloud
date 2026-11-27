@@ -10,38 +10,11 @@ runs inside EDA's own network simulator, so you need an EDA, not hardware.
 
 ## The lab at a glance
 
-```mermaid
-flowchart TB
-  inet["Internet router<br/>(stands in for the internet)"]
-  subgraph inetedge["Internet edge"]
-    br["border-router-1/2<br/>7250 IXR-X1B"]
-  end
-  subgraph dc1["Data center 1: frontend fabric"]
-    bl["border-leaf-1/2<br/>7250 IXR-X1B"]
-    sp["ns-spine-1/2<br/>7220 IXR-H5-64O-512"]
-    lf["leaf-3 … leaf-8<br/>7220 IXR-H5-64O-512"]
-    sl["svc-leaf-1/2<br/>7220 IXR-D5"]
-  end
-  subgraph dc2["Data center 2"]
-    d2["dc2-border-leaf-1/2<br/>7250 IXR-X1B"]
-  end
-  subgraph be["GPU backend"]
-    rl["rail-leaf-1 … rail-leaf-8<br/>7220 IXR-H5-64O-512"]
-    ew["ew-spine-1 … ew-spine-4<br/>7220 IXR-H5-64O-512"]
-  end
-  gpu["GPU Server 1-4<br/>8 GPUs each"]
-  st["storage-1/2"]
-  ss["shared-service · fw-1"]
-  ss2["shared-service-2"]
-  inet --- br --- bl --- sp --- lf
-  sp --- sl
-  bl ---|DCI, MACsec-ready| d2
-  lf --- gpu
-  lf --- st
-  sl --- ss
-  d2 --- ss2
-  gpu ---|one NIC per GPU| rl --- ew
-```
+![The NeoCloud Grafana map with the demo traffic running](docs/neocloud-grafana.png)
+
+*The live Grafana map that the deploy builds, with the demo traffic running: every cable is coloured by its current
+rate in each direction (grey idle, green traffic, yellow, orange and red for higher rates), and every GPU tile shows
+the tenant that has booked it (T1 = tenant1, free = in the pool).*
 
 | Part | Switches | Built by one EDA object |
 |---|---|---|
@@ -107,8 +80,8 @@ Who reaches whom:
    26.7.1 and 26.7.2, one switch of every redundant pair at a time, with checks before and after each half. The
    frontend, data center and internet traffic loses about a second at most; a GPU's rail goes dark only while its own
    rail leaf is upgraded.
-10. **Live views.** A Grafana map of the whole lab with live traffic on every cable and every GPU coloured by its
-    tenant, and an EDA GUI dashboard, **NeoCloud Operations** (GPU capacity per tenant, tenant networks, backend
+10. **Live views.** A Grafana map of the whole lab (the picture above) with live traffic on every cable and every GPU
+    coloured by its tenant, and an EDA GUI dashboard, **NeoCloud Operations** (GPU capacity per tenant, tenant networks, backend
     health, isolation proof, alarms), with its own short navigation menu **NeoCloud**.
 
 ## What you need
