@@ -158,10 +158,6 @@ simulator pod restart:
 Phases: `ns users topology fabrics backend edge vpcs macsec hosts grafana dashboard monitoring upgrade verify`.
 `all` (the default) runs them in that order; `topology` deletes and rebuilds the switches.
 
-**Unattended runs.** Every answer can come from the environment: `EDA_URL`, `EDA_ADMIN_USER`, `EDA_ADMIN_PASSWORD`,
-`NC_KUBECONFIG`, `NC_CONTEXT`, `NEOCLOUD_LICENSE`; `--yes` skips the confirmation; `KC_MASTER_USER` and
-`KC_MASTER_PASSWORD` override the Keycloak admin.
-
 ## What it creates on the EDA
 
 - **Inside EDA namespace `neocloud`** (Kubernetes namespace `neocloud` too): the topology (28 switches and 10 simulated
