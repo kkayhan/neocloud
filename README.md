@@ -164,8 +164,8 @@ Phases: `ns users topology fabrics backend edge vpcs macsec hosts grafana dashbo
 ./destroy.sh
 ```
 
-This deletes the lab and everything the deploy created for it, except the Prometheus Exporter and Notifiers apps, which
-others may use. It takes about a minute and a half. It may show a few FAILED transactions in the EDA GUI while the
+This deletes the lab and everything the deploy created for it, except the Prometheus Exporter and Notifiers apps and
+the SR Linux 26.7.2 image, which others may use. It takes about a minute and a half. It may show a few FAILED transactions in the EDA GUI while the
 switches go away; that is harmless.
 
 ## Running the demo
