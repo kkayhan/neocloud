@@ -158,31 +158,15 @@ simulator pod restart:
 Phases: `ns users topology fabrics backend edge vpcs macsec hosts grafana dashboard monitoring upgrade verify`.
 `all` (the default) runs them in that order; `topology` deletes and rebuilds the switches.
 
-## What it creates on the EDA
-
-- **Inside EDA namespace `neocloud`** (Kubernetes namespace `neocloud` too): the topology (28 switches and 10 simulated
-  hosts, the internet router included) and its pools, the Fabrics, the Backend, the Virtual Networks and routing
-  policies, two Configlets (DCI MACsec, and an ESI setting the X1B needs), the monitoring objects, the NodeProfile for SR Linux
-  26.7.2, the alert receiver, and Prometheus + Grafana for the map.
-- **Outside the namespace:**
-  - in `eda-system`: the licence ConfigMap `neocloud-srl-sim-license`, HttpProxy `neocloud-grafana`, three Exports
-    `neocloud-*`, TopologyGrouping `neocloud-tiers` (spine/leaf tiers in EDA's topology view), the Artifact
-    `srlinux-ghcr-26.7.2` and the PipelineDefinition `neocloud-upgrade-pipeline`;
-  - Nokia's own `deployimage-pipeline` is kept disabled (EDA ships it disabled), so that an image upgrade runs only the
-    lab's pipeline; if you had enabled it, the deploy turns it off;
-  - the EDA user `terraform` (group system-administrator), used by the Terraform part;
-  - the shared GUI dashboard **NeoCloud Operations** and navigation panel **NeoCloud**, visible to every EDA user;
-  - the Prometheus Exporter and Notifiers apps, only if they were missing.
-
 ## Remove
 
 ```bash
 ./destroy.sh
 ```
 
-This deletes everything listed above except the two apps and the 26.7.2 Artifact, which others may use; Nokia's
-`deployimage-pipeline` stays disabled, as EDA ships it. It takes about a minute and a half. It may show a few FAILED transactions in the EDA
-GUI while the switches go away; that is harmless.
+This deletes the lab and everything the deploy created for it, except the Prometheus Exporter and Notifiers apps, which
+others may use. It takes about a minute and a half. It may show a few FAILED transactions in the EDA GUI while the
+switches go away; that is harmless.
 
 ## Running the demo
 
