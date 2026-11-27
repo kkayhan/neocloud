@@ -89,10 +89,6 @@ Who reaches whom:
 **The EDA**
 
 - Nokia EDA **26.8** in simulation mode (built and tested on 26.8.2). A Try EDA installation on Kind works.
-- The **AI Fabrics** app (`aifabrics.eda.nokia.com`), which ships with EDA 26.8.2, and the NodeProfile
-  `srlinux-ghcr-26.7.1` in namespace `eda`, which ships with EDA 26.8.
-- The **Prometheus Exporter** and **Notifiers** apps. If either is missing, the deploy installs it from EDA's
-  built-in catalog.
 - Room for the lab: its 38 simulator pods plus Prometheus, Grafana and the alert receiver request about 15 CPU and
   42 GiB of memory, on top of EDA itself. With EDA it comes to about 90 pods, within Kind's default limit of 110 pods
   per node.
