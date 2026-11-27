@@ -216,16 +216,3 @@ Every tool uses the connection saved by `./deploy.sh`; run them from the reposit
 10. **The fabric upgrade.** In the GUI: Workflows → Deploy Image Pipeline → Create, Node Profile `srlinux-ghcr-26.7.2`,
     tranche `tranche-a` with selector `upgrade-group=a`, then `tranche-b` with `upgrade-group=b`, no canary, and a new
     name for every run. Or run `bash upgrade/run.sh 26.7.2`, which also measures the traffic. Go back with `26.7.1`.
-
-## Notes
-
-- The simulator forwards real packets but never congests, so the RoCE QoS (ECN, PFC) shows in the configuration, not
-  in the counters. MACsec is configured but administratively disabled: in the simulator an enabled MACsec port stops
-  forwarding.
-- SR Linux 26.7.1 is newer than the releases EDA 26.8.2's apps officially list; it works in the simulator.
-- The network config of a simulated host lives in its pod. If a host pod restarts, run `./deploy.sh --phase hosts`.
-- All simulators on one Kubernetes node share the node's ARP table, which Linux limits to 1024 entries by default.
-  This lab adds about 600. On a small single-node cluster (Kind) run it next to nothing else of that size, or raise
-  `net.ipv4.neigh.default.gc_thresh3` on the node.
-- An EDA digital twin (Branch) of this lab does not boot its switches on its own: a Branch does not copy the licence
-  ConfigMap the switches' NodeProfile points to.
