@@ -1,0 +1,47 @@
+# neocloud telemetry: what EDA's Prometheus exporter (app prom.eda.nokia.com, core-installed,
+# endpoint /core/httpproxy/v1/prometheus-exporter/metrics) publishes for the topology dashboard:
+# port oper-state + port traffic rate of the 28 switches + the GPU tenant labels. Own names (neocloud-*) and `where` = namespace
+# neocloud only, so another demo's Exports (aifabric-*) neither collide nor duplicate series
+# (telemetry-stack §24). Exports live in eda-system; deploy.sh grafana applies them, destroy.sh deletes them.
+apiVersion: prom.eda.nokia.com/v1alpha1
+kind: Export
+metadata:
+  name: neocloud-interface-state
+  namespace: eda-system
+spec:
+  exports:
+    - path: .namespace.node.srl.interface
+      where: '.namespace.name = "neocloud"'
+      fields: [oper-state]
+      mappings:
+        - { source: up, destination: "1" }
+        - { source: down, destination: "0" }
+      metricName: { regex: namespace_(.+), replacement: $1 }
+---
+apiVersion: prom.eda.nokia.com/v1alpha1
+kind: Export
+metadata:
+  name: neocloud-interface-rate
+  namespace: eda-system
+spec:
+  exports:
+    - path: .namespace.node.srl.interface.traffic-rate
+      where: '.namespace.name = "neocloud"'
+      metricName: { regex: namespace_(.+), replacement: $1 }
+---
+# Tenant per GPU = the `backend` label (tenant1|tenant2) of each GPU's rail Interface (rail-leaf-<G>-ethernet-1-<S>, role=gpu; no
+# label = free). A booking = relabel that Interface ⇒ the dashboard's GPU tile follows within a scrape.
+# resource mode = one series per CR, value 1, the listed CR labels as metric labels (aifabric-tenant pattern).
+apiVersion: prom.eda.nokia.com/v1alpha1
+kind: Export
+metadata:
+  name: neocloud-tenant
+  namespace: eda-system
+spec:
+  exports:
+    - resource:
+        group: interfaces.eda.nokia.com
+        version: v1
+        kind: interface
+        namespace: neocloud
+        labels: [role, backend, host, rail]

@@ -1,0 +1,21 @@
+# neocloud — X1B all-active ESI-LAG fix (eda-lab: SR Linux 26.3.2 AND 26.7.1 on 7250 IXR-X1B default ethernet-segment
+# `use-esi-label true` ⇒ ES oper-down `no-esi-label` under VXLAN; EDA has no knob ⇒ Configlet Update with the
+# list key). RE-MEASURED 2026-11-02 on X1B 26.7.1: Configlet removed ⇒ both DC2 ESs `down / no-esi-label` within
+# seconds, restored ⇒ up ⇒ still required; H5/D5 26.7.1 do not have the leaf. Only the DC2 border leaves carry ESI-LAG hosts (dc2-host-1/2); the DC1 X1Bs have none, and an
+# Update of an ES a node does not have fails ⇒ selector = fabric=dc2 only. Applied after the VPCs, which make
+# EDA render the ethernet segments.
+# 2026-11-10 → 11-12 the hairpin hand-off ESs needed the same fix (+ Configlet dc1-handoff-esi-no-label); both gone with the
+# stretched EVPN domain (owner 2026-11-12).
+apiVersion: config.eda.nokia.com/v1
+kind: Configlet
+metadata:
+  name: dc2-esi-no-label
+  namespace: neocloud
+spec:
+  operatingSystem: srl
+  endpointSelectors: [ fabric=dc2 ]
+  configs:
+    # DC2 has ONE dual-homed host since 2026-11-16 (shared-service-2; was dc2-host-1 + dc2-host-2)
+    - path: .system.network-instance.protocols.evpn.ethernet-segments.bgp-instance{.id==1}.ethernet-segment{.name=="lag-shared-service-2-local"}
+      operation: Update
+      config: '{"name":"lag-shared-service-2-local","use-esi-label":false}'

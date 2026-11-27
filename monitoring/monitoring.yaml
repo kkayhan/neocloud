@@ -1,0 +1,49 @@
+# neocloud — monitoring + alerting (owner 2026-11-09 Q9 A: EDA alarms + a traffic-rate Threshold + the notifiers app
+# to a LOCAL receiver; the live Grafana topology stays the bandwidth view).
+#
+# 1 Threshold port-traffic-high: every row of .namespace.node.srl.interface.traffic-rate (every port of every switch;
+#   a Threshold has no row filter, eda-demo § THRESHOLD) on out-bps, rising: warning 1 Mb/s, major 10 Mb/s, critical
+#   50 Mb/s (lab scale: idle ports ≈1 kb/s; iperf3 30 Mb/s storage-1 -> storage-2 (verify § 7) ⇒ major on the storage ports + ISLs on the path,
+#   measured 2026-11-09). Rate (not a counter) ⇒ the alarm follows the traffic down. Alarm type
+#   = "<spec.name>thresholdexceeded" = PortTrafficHighthresholdexceeded. generateOverlay ⇒ topology overlay in the GUI.
+# 2 Provider alert-sink: shoutrrr generic webhook to the in-lab receiver (alert-sink.yaml), plain HTTP, JSON body.
+#   Swap the uri for slack://… / teams://… / smtp://… to reach a real channel (outside the lab: owner decision).
+# 3 Notifier lab-alarms: every alarm type EXCEPT the CX simulator's fake hardware rows (InterfaceTransceiverDown,
+#   FanTrayFailure, PowerSupplyFailure: 348 rows on the idle lab, sourced by cluster discovery, not shown in the GUI
+#   alarm list). On real hardware drop the excludes. LLDPTopologyMisaligned IS notified (= a cabling mistake; the 32
+#   false ones on the GPU rails were fixed in hosts.sh 2026-11-09, phase 5). A link failure raises InterfaceDown, InterfaceMemberDown, SubinterfaceDown,
+#   TopoLinkDown, RoutedInterfaceDown, BGPPeerDown, RouterDegraded, VirtualNetworkDegraded (CE link test 2026-11-09).
+apiVersion: oam.eda.nokia.com/v1
+kind: Threshold
+metadata: { name: port-traffic-high, namespace: neocloud }
+spec:
+  name: PortTrafficHigh
+  enabled: true
+  generateOverlay: true
+  path: .namespace.node.srl.interface.traffic-rate
+  field: out-bps
+  thresholds: { direction: Rising, warningThreshold: 1000000, majorThreshold: 10000000, criticalThreshold: 50000000 }
+  alarm:
+    description: "Port sends more than the lab's utilisation limit (warning 1 Mb/s, major 10 Mb/s, critical 50 Mb/s)"
+    probableCause: "Traffic on this port is above its threshold"
+    remedialAction: "Check which flows use the port (Grafana topology, interface statistics); rebalance or add capacity"
+---
+apiVersion: notifiers.eda.nokia.com/v1
+kind: Provider
+metadata: { name: alert-sink, namespace: neocloud }
+spec:
+  description: "In-lab webhook receiver (stands in for Slack / Teams / ticketing)"
+  enabled: true
+  uri: "generic://alert-sink.neocloud.svc:8080/eda?disabletls=yes&template=json"
+---
+apiVersion: notifiers.eda.nokia.com/v1
+kind: Notifier
+metadata: { name: lab-alarms, namespace: neocloud }
+spec:
+  description: "Every neocloud alarm (except the simulator's fake hardware rows) to the alert receiver"
+  enabled: true
+  providers: [ alert-sink ]
+  sources:
+    alarms:
+      include: [ "*" ]
+      exclude: [ InterfaceTransceiverDown, FanTrayFailure, PowerSupplyFailure ]

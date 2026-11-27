@@ -1,0 +1,55 @@
+# neocloud — local alert receiver (owner 2026-11-09 Q9 A: notifications stay inside the lab, nothing is posted outside).
+# A tiny HTTP server in k8s ns neocloud that stands in for Slack / Teams / a ticketing webhook:
+#   POST /<anything>  = a notification from EDA's notifier (shoutrrr "generic" webhook) ⇒ printed to the pod log
+#                       (one line per notification) and kept in memory (last 200)
+#   GET  /alerts      = the kept notifications as JSON (newest last), used by verify.sh and the RUNBOOK scene
+# Reached by the notifier as http://alert-sink.neocloud.svc:8080 (Provider in monitoring.yaml). Dies with ns neocloud.
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: alert-sink, namespace: neocloud }
+data:
+  sink.py: |
+    import json, sys, time
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    KEPT = []
+    class H(BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = self.rfile.read(int(self.headers.get("Content-Length") or 0)).decode("utf-8", "replace")
+            try: msg = json.loads(body)
+            except ValueError: msg = body
+            rec = {"received": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "path": self.path, "message": msg}
+            KEPT.append(rec); del KEPT[:-200]
+            print("ALERT " + json.dumps(rec), flush=True)
+            self.send_response(200); self.end_headers()
+        def do_GET(self):
+            out = json.dumps(KEPT if self.path.startswith("/alerts") else {"ok": True}).encode()
+            self.send_response(200); self.send_header("Content-Type", "application/json"); self.end_headers()
+            self.wfile.write(out)
+        def log_message(self, *a): pass
+    print("alert-sink listening on :8080", flush=True)
+    ThreadingHTTPServer(("0.0.0.0", 8080), H).serve_forever()
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: alert-sink, namespace: neocloud, labels: { app: alert-sink } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: alert-sink } }
+  template:
+    metadata: { labels: { app: alert-sink } }
+    spec:
+      containers:
+        - name: sink
+          image: ghcr.io/srl-labs/network-multitool
+          command: [ "python3", "-u", "/app/sink.py" ]
+          ports: [ { containerPort: 8080 } ]
+          resources: { requests: { cpu: 10m, memory: 32Mi } }
+          volumeMounts: [ { name: app, mountPath: /app } ]
+      volumes: [ { name: app, configMap: { name: alert-sink } } ]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: alert-sink, namespace: neocloud }
+spec:
+  selector: { app: alert-sink }
+  ports: [ { port: 8080, targetPort: 8080 } ]

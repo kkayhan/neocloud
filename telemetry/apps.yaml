@@ -1,0 +1,16 @@
+# EDA's Prometheus exporter app (CRD exports.prom.eda.nokia.com, pod eda-px, HttpProxy prometheus-exporter).
+# NOT part of a fresh EDA install: Talos had it from an earlier demo's AppInstaller, a fresh Kind (2026-11-02) did not
+# ⇒ deploy.sh phase grafana creates this when the CRD is missing. v7.0.1 = EDA 26.8.2 (telemetry-stack skill).
+# destroy.sh leaves the app installed (other demos may use it).
+apiVersion: appstore.eda.nokia.com/v1
+kind: AppInstaller
+metadata:
+  generateName: neocloud-prom-exporter-install-
+  namespace: eda-system
+spec:
+  operation: install
+  apps:
+    - appId: prom.eda.nokia.com
+      catalog: eda-catalog-builtin-apps
+      version:
+        value: v7.0.1

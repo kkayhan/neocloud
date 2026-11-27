@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+# neocloud-ssh — console + scripted access to the neocloud CSP DC lab (EDA namespace neocloud). Sibling of aifabric-ssh.
+# Reaches the EDA that ./deploy.sh saved (.state/kubectl); KUBECTL=<kubectl command> overrides it. Needs jq + sshpass.
+#   switches (cx-kind=srl)  -> SR Linux CLI over real ssh, tunnelled through a /dev/tcp relay in eda-toolbox
+#                              (no port-forward, no host route to the pod network); admin / NokiaSrl1!
+#   hosts    (cx-kind=linux) -> root shell via kubectl exec (multitool has no sshd)
+#
+#   neocloud-ssh                          interactive picker
+#   neocloud-ssh NODE                     connect
+#   neocloud-ssh gpu-server-S/gpuG        GPU G's VM inside GPU Server S (its own netns: rail NIC + tenant frontend leg)
+#   neocloud-ssh -l                       inventory (role, fabric, platform, SR Linux version)
+#   neocloud-ssh --gpus                   the 32 GPUs: tenant (live Interface label), backend + frontend address
+#   neocloud-ssh -c 'CMD' NODE            run CMD, clean output
+#   neocloud-ssh --all-switch -c 'CMD'    every switch          --all-host -c 'CMD'   every host
+#   neocloud-ssh --fabric frontend|backend|dc2 -c 'CMD'         switches of one fabric
+#   neocloud-ssh --role spine|leaf|borderleaf|border-router -c 'CMD'
+# Examples:
+#   neocloud-ssh -c 'show network-instance default protocols bgp neighbor' border-router-1
+#   neocloud-ssh --fabric dc2 -c 'show network-instance tenant1-vrf route-table'
+#   neocloud-ssh --role borderleaf -c 'info transport-security macsec'
+#   neocloud-ssh -c 'vtysh -c "show bgp ipv4 unicast summary"' internet
+#   neocloud-ssh -c 'ping -c2 100.100.100.125' gpu-server-1/gpu1
+# Host network config lives in the sim pod and is lost on a pod restart: re-run `bash hosts.sh <host>`.
+set -euo pipefail
+HERE=$(dirname "$(readlink -f "$0")")
+if [ -z "${KUBECTL:-}" ] || [ "$KUBECTL" = kubectl ]; then KUBECTL="$HERE/.state/kubectl"; [ -x "$KUBECTL" ] || KUBECTL=kubectl; fi
+CORE_NS=eda-system
+NS=neocloud
+SR_USER="${NEOCLOUD_SSH_USER:-admin}"
+SR_PASS="${NEOCLOUD_SSH_PASS:-NokiaSrl1!}"
+RELAY=/tmp/neocloud-ssh-relay.sh
+MODE=pick WANT_NODE="" CMD="" GROUP="" GNS=""
+
+usage(){ sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'; }
+die(){ echo "neocloud-ssh: $*" >&2; exit "${2:-1}"; }
+command -v jq >/dev/null || die "jq is not installed"
+
+while (($#)); do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    -l|--list) MODE=list; shift ;;
+    -g|--gpus) MODE=gpus; shift ;;
+    -c|--command) CMD="${2:?-c needs a command}"; shift 2 ;;
+    --all-switch) GROUP='$2=="srl"'; shift ;;
+    --all-host) GROUP='$2=="linux"'; shift ;;
+    --fabric) GROUP="\$2==\"srl\" && \$4==\"${2:?}\""; shift 2 ;;
+    --role) GROUP="\$2==\"srl\" && \$3==\"${2:?}\""; shift 2 ;;
+    -*) die "unknown flag $1 (try -h)" ;;
+    *) WANT_NODE="$1"; shift ;;
+  esac
+done
+if [[ "$WANT_NODE" =~ ^(gpu-server-[0-9]+)/(gpu[1-8])$ ]]; then WANT_NODE=${BASH_REMATCH[1]}; GNS=${BASH_REMATCH[2]}; fi
+[[ -n "$WANT_NODE" ]] && MODE=exec
+[[ -n "$GROUP" ]] && { MODE=group; [[ -n "$CMD" ]] || die "group mode needs -c 'CMD'"; }
+
+# TSV: node kind role fabric platform version pod ip   (every field non-empty: IFS=$'\t' read collapses empties)
+discover(){
+  local pods topo
+  pods=$("$KUBECTL" -n $CORE_NS get pods -l "cx-node-namespace=$NS" -o json) || die "cannot list sim pods"
+  topo=$("$KUBECTL" -n $NS get toponodes -o json 2>/dev/null || echo '{"items":[]}')
+  jq -r --argjson topo "$topo" '
+    ($topo.items | map({key: .metadata.name, value: {l: .metadata.labels, p: .spec.platform, v: .spec.version}}) | from_entries) as $t
+    | [.items[] | select(.status.phase == "Running" and .metadata.deletionTimestamp == null)
+       | (.metadata.labels["cx-chassis-name"] // .metadata.labels["cx-pod-name"]) as $n
+       | {n: $n, k: .metadata.labels["cx-kind"], pod: .metadata.name, ip: (.status.podIP // "-"), c: .metadata.creationTimestamp,
+          r: ($t[$n].l.role // "host"), f: ($t[$n].l.fabric // "-"), p: ($t[$n].p // "multitool" | gsub(" "; "_")), v: ($t[$n].v // "-")}]
+    | group_by(.n) | map(max_by(.c))
+    | sort_by([({"border-router":0,"spine":1,"borderleaf":2,"leaf":3,"host":4}[.r] // 5), .f, .n])[]
+    | [.n, .k, .r, .f, .p, .v, .pod, .ip] | @tsv' <<<"$pods"
+}
+
+list_mode(){
+  printf '\n== %s ==\n  %-18s %-14s %-9s %-20s %s\n' "$NS" NODE ROLE FABRIC PLATFORM SRL
+  discover | while IFS=$'\t' read -r n k r f p v _ _; do printf '  %-18s %-14s %-9s %-20s %s\n' "$n" "$r" "$f" "${p//_/ }" "$v"; done; echo
+}
+
+TB=""
+prepare_toolbox(){
+  [[ -n "$TB" ]] && return
+  TB=$("$KUBECTL" -n $CORE_NS get pods -l eda.nokia.com/app=eda-toolbox -o jsonpath='{.items[0].metadata.name}')
+  "$KUBECTL" -n $CORE_NS exec -i "$TB" -- sh -c "cat > $RELAY" <<'RELAY'
+exec 3<>/dev/tcp/$1/$2
+cat <&3 & PID=$!
+trap "kill $PID 2>/dev/null" EXIT
+cat >&3
+RELAY
+}
+SSHO=(-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -o ConnectTimeout=15)
+
+run_one(){  # run_one <node> <kind> <pod> <ip> [interactive]
+  if [[ "$2" == srl ]]; then
+    prepare_toolbox
+    local px="ProxyCommand=$KUBECTL -n $CORE_NS exec -i $TB -- bash $RELAY %h %p"
+    if [[ -n "${5:-}" ]]; then exec sshpass -p "$SR_PASS" ssh -tt "${SSHO[@]}" -o "$px" "$SR_USER@$4"; fi
+    sshpass -p "$SR_PASS" ssh -n "${SSHO[@]}" -o "$px" "$SR_USER@$4" "$CMD" 2>&1 | tr -d '\r'
+  elif [[ -n "$GNS" ]]; then   # GPU VM = netns $GNS inside the server sim
+    if [[ -n "${5:-}" ]]; then exec "$KUBECTL" -n $CORE_NS exec -it -c "$1" "$3" -- ip netns exec "$GNS" sh -c 'cd /root; PS1="'"$1/$GNS"' # " exec bash --norc 2>/dev/null || exec sh'; fi
+    "$KUBECTL" -n $CORE_NS exec -c "$1" "$3" -- ip netns exec "$GNS" sh -c "$CMD" 2>&1 </dev/null
+  else
+    if [[ -n "${5:-}" ]]; then exec "$KUBECTL" -n $CORE_NS exec -it -c "$1" "$3" -- sh -c 'cd /root; exec bash 2>/dev/null || exec sh'; fi
+    "$KUBECTL" -n $CORE_NS exec -c "$1" "$3" -- sh -c "$CMD" 2>&1 </dev/null
+  fi
+}
+
+gpus_mode(){  # tenant per GPU = label of its rail Interface; addresses = what hosts.sh configures from it
+  local K=$KUBECTL
+  eval "$(sed -n '/^gpu_state(){/,/^}/p' "$HERE/hosts.sh")"
+  printf '\n== %s GPUs (tenant = label `backend` of Interface rail-leaf-<G>-ethernet-1-<S>) ==\n' "$NS"
+  printf '  %-18s %-10s %-24s %s\n' GPU TENANT BACKEND FRONTEND
+  gpu_state | awk '{s = $1; sub(/gpu-server-/, "", s)
+    fe = ($3 == "-") ? "-" : sprintf("%s.%d", ($3 == "1" ? "100.100.100" : "200.200.200"), 100 + 10 * s + $2)
+    be = ($3 == "-") ? "- (parked)" : ($4 == "-" ? "(not rendered yet)" : $4 "::2")
+    printf "  %-18s %-10s %-24s %s\n", $1 "/gpu" $2, ($3 == "-" ? "free" : "tenant" $3), be, fe}'
+  echo
+}
+
+case "$MODE" in
+  list) list_mode ;;
+  gpus) gpus_mode ;;
+  exec|pick)
+    rows=$(discover)
+    if [[ "$MODE" == pick ]]; then
+      mapfile -t arr <<<"$rows"; i=1
+      for r in "${arr[@]}"; do IFS=$'\t' read -r n _ ro f _ <<<"$r"; printf '  %3d  %-18s %-14s %s\n' $i "$n" "$ro" "$f" >&2; i=$((i+1)); done
+      read -rp "Pick a number or name (q quits): " ch </dev/tty
+      [[ -z "$ch" || "$ch" == q ]] && exit 0
+      [[ "$ch" =~ ^[0-9]+$ ]] && WANT_NODE=$(cut -f1 <<<"${arr[$((ch-1))]}") || WANT_NODE="$ch"
+    fi
+    row=$(awk -F'\t' -v n="$WANT_NODE" '$1==n' <<<"$rows")
+    [[ -n "$row" ]] || die "no running node '$WANT_NODE' in ns $NS (neocloud-ssh -l)"
+    IFS=$'\t' read -r n k _ _ _ _ pod ip <<<"$row"
+    if [[ -n "$CMD" ]]; then run_one "$n" "$k" "$pod" "$ip"; else echo "==> $n" >&2; run_one "$n" "$k" "$pod" "$ip" tty; fi ;;
+  group)
+    rows=$(discover | awk -F'\t' "$GROUP")
+    [[ -n "$rows" ]] || die "no node matches"
+    tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT; i=0
+    grep -q $'\tsrl\t' <<<"$rows" && prepare_toolbox
+    while IFS=$'\t' read -r n k _ _ _ _ pod ip; do
+      echo "$n" > "$tmp/$i.n"; ( run_one "$n" "$k" "$pod" "$ip" > "$tmp/$i" 2>&1 || echo "  (failed on $n)" >> "$tmp/$i" ) </dev/null &
+      i=$((i+1))
+    done <<<"$rows"
+    wait
+    for ((j=0; j<i; j++)); do printf '\n===== %s =====\n' "$(cat "$tmp/$j.n")"; cat "$tmp/$j"; done ;;
+esac

@@ -1,0 +1,91 @@
+# neocloud — WHO REACHES WHAT: every PrefixSet + Policy of the route leaking between the VRFs (owner 2026-11-12 redesign:
+# tenants never peer BGP with the border routers; VRF internet on the DC1 border leaves holds the BRs' 0/0 and leaks it
+# into tenant1 only; one subnet per tenant, no overlap). Applied FIRST in phase edge (edge.yaml + vpcs.yaml reference it).
+#
+#   VRF (Router)            routeLeaking export          routeLeaking import
+#   tenant1-vrf            100.100.100.0/24             shared (10.10.10.0/24 + 10.20.20.0/24) + 0.0.0.0/0 (internet)
+#   tenant2-vrf            200.200.200.0/24             shared (10.10.10.0/24 + 10.20.20.0/24) (+ 0/0 in the internet variant)
+#     ⇑ tenant2 = NOT in the baseline: onboarding (tenant-onboarding/) creates its PrefixSet + 2 Policies and adds its prefix
+#       to leak-shared-import (+ internet variant: leak-internet-import, PrefixSet internet-public)
+#   shared-services-vrf     10.10.10.0/24 (storage)      100.100.100.0/24 (+ 200.200.200.0/24 once tenant2 is onboarded)
+#                           + 10.20.20.0/24 (shared-service)
+#   internet (border leaves  0.0.0.0/0                   100.100.100.0/24
+#    + service leaves)       (+ its own fw-1 subnet 203.0.113.128/26, edge.yaml, reached by tenant1 through the 0/0)
+#   ⇒ tenant1 <-> shared, tenant2 <-> shared, tenant1 <-> internet; tenant1 <-> tenant2 NEVER (neither imports the
+#     other; shared and internet export only their own prefix ⇒ non-transitive).
+#
+# HOW (SR Linux, MEASURED 2026-11-09 + 2026-11-12 probe txns 1046/1047, SRL config-basics § Network-instance route
+# leaking): Router.spec.routeLeaking = `inter-instance-policies` on every switch where BOTH VRFs exist ⇒ LOCAL per switch.
+#   - PrefixSets cover /24..32: the host routes must leak too (a leaked subnet alone drops traffic to remote hosts).
+#   - a leaf re-advertises a leaked ARP host route / leaked BGP route as EVPN RT-5 in the IMPORTING VRF (that is how
+#     the 0/0 reaches every DC1 leaf in tenant1, and how storage + shared-service are reached from every leaf).
+#   - tie-break for one prefix: preference → metric → non-leaked beats leaked ⇒ Router internet has
+#     bgp.ebgpPreference 160 (edge.yaml): the leaked 0/0 keeps 160 and wins over the other border leaf's RT-5 copy (170)
+#     ⇒ no ping-pong between the border leaves.
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: PrefixSet
+metadata: { name: tenant1-subnet, namespace: neocloud }
+spec: { prefixes: [ { prefix: 100.100.100.0/24, startRange: 24, endRange: 32 } ] }
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: PrefixSet
+metadata: { name: shared-services-subnet, namespace: neocloud }
+# both subnets of the shared-services ip-vrf (owner 2026-11-12; was 10.110.0.0/24)
+spec:
+  prefixes:
+    - { prefix: 10.10.10.0/24, startRange: 24, endRange: 32 }   # storage
+    - { prefix: 10.20.20.0/24, startRange: 24, endRange: 32 }   # shared-service
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: PrefixSet
+metadata: { name: default-route, namespace: neocloud }
+spec: { prefixes: [ { prefix: 0.0.0.0/0, startRange: 0, endRange: 0 } ] }
+---
+# ---------- tenant1 ----------
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-tenant1-export, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements: [ { name: tenant1, match: { prefixSet: tenant1-subnet }, action: { policyResult: Accept } } ]
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-tenant1-import, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements:
+    - { name: shared-services, match: { prefixSet: shared-services-subnet }, action: { policyResult: Accept } }
+    - { name: internet-default, match: { prefixSet: default-route }, action: { policyResult: Accept } }
+---
+# ---------- shared-services ----------
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-shared-export, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements: [ { name: shared-services, match: { prefixSet: shared-services-subnet }, action: { policyResult: Accept } } ]
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-shared-import, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements:
+    - { name: tenant1, match: { prefixSet: tenant1-subnet }, action: { policyResult: Accept } }
+    # tenant2 statement is ADDED by its onboarding (owner Q4 B 2026-11-12: onboarding edits the shared objects)
+---
+# ---------- internet (border leaves) ----------
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-internet-export, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements: [ { name: default, match: { prefixSet: default-route }, action: { policyResult: Accept } } ]
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-internet-import, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements: [ { name: tenant1, match: { prefixSet: tenant1-subnet }, action: { policyResult: Accept } } ]

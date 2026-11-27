@@ -1,0 +1,949 @@
+{
+  "name": "NeoCloud Operations",
+  "displayName": "NeoCloud Operations",
+  "uuid": "8ef46102-30a3-56d2-a695-18d563d6d19a",
+  "version": "1.0.0",
+  "builderVersion": "1.2.0",
+  "showNavigationToolbar": true,
+  "screens": [
+    {
+      "name": "NeoCloud Operations",
+      "uuid": "753ecc27-6117-5fe4-b7b4-b3172b178a9d",
+      "type": "screen",
+      "screenType": "dashboard",
+      "url": "Dashboard-0",
+      "partOfNav": true,
+      "startScreen": true,
+      "showFilterBar": false,
+      "queryFilters": [],
+      "components": [
+        {
+          "uuid": "f6650d5f-f8ed-59f8-9f04-ea4035c433b6",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletDonutChart",
+              "uuid": "4c569457-7618-5b76-a518-3f6635bd28e8",
+              "name": "",
+              "type": "dashletDonutChart",
+              "title": "GPU allocation",
+              "subtitle": "All GPUs: booked per tenant, free = sellable now (live Interface labels)",
+              "width": 400,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "componentConfigurations": [
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                    "queryType": "eql",
+                    "requestType": "get",
+                    "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu').map(r => ({ Tenant: r.L.backend || 'free' }));"
+                  },
+                  "additionalConfiguration": {
+                    "title": "GPU allocation",
+                    "donutId": "bb96fac2-afcc-51da-922d-1a749ee7a725",
+                    "hideTitle": true,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "tenant1",
+                        "color": "#2563eb",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant1"
+                      },
+                      {
+                        "label": "tenant2",
+                        "color": "#ea580c",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant2"
+                      },
+                      {
+                        "label": "free",
+                        "color": "#cbd5e1",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "free"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                }
+              ]
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "474e156e-77b3-50f4-afe8-838e29bce137",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Sellable GPU capacity",
+              "subtitle": "Free GPUs can be booked by a new or existing tenant",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "const g = data.filter(r => (r.L || {}).role === 'gpu');\nconst free = g.filter(r => !r.L.backend).length;\nreturn [{ Free: free, Booked: g.length - free }];"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Free GPUs",
+                      "color": "#3bb34a",
+                      "field": "Free",
+                      "type": "string"
+                    },
+                    {
+                      "label": "Booked GPUs",
+                      "color": "#005aff",
+                      "field": "Booked",
+                      "type": "string"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletDonutChart",
+              "uuid": "e7a493ef-b7c7-5894-a115-b4bca7ab07a2",
+              "name": "",
+              "type": "dashletDonutChart",
+              "title": "GPUs per GPU server",
+              "subtitle": "8 GPUs each; GPU G = NIC ethG = rail G",
+              "width": 1000,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "componentConfigurations": [
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                    "queryType": "eql",
+                    "requestType": "get",
+                    "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu' && (r.L || {}).host === 'gpu-server-1').map(r => ({ Tenant: r.L.backend || 'free' }));"
+                  },
+                  "additionalConfiguration": {
+                    "title": "GPU Server 1",
+                    "donutId": "80c6e715-f8c6-50cb-b848-80e60c21a609",
+                    "hideTitle": false,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "tenant1",
+                        "color": "#2563eb",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant1"
+                      },
+                      {
+                        "label": "tenant2",
+                        "color": "#ea580c",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant2"
+                      },
+                      {
+                        "label": "free",
+                        "color": "#cbd5e1",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "free"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                },
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                    "queryType": "eql",
+                    "requestType": "get",
+                    "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu' && (r.L || {}).host === 'gpu-server-2').map(r => ({ Tenant: r.L.backend || 'free' }));"
+                  },
+                  "additionalConfiguration": {
+                    "title": "GPU Server 2",
+                    "donutId": "ecae5b72-52b0-5ada-88fb-8fc064c67750",
+                    "hideTitle": false,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "tenant1",
+                        "color": "#2563eb",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant1"
+                      },
+                      {
+                        "label": "tenant2",
+                        "color": "#ea580c",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant2"
+                      },
+                      {
+                        "label": "free",
+                        "color": "#cbd5e1",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "free"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                },
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                    "queryType": "eql",
+                    "requestType": "get",
+                    "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu' && (r.L || {}).host === 'gpu-server-3').map(r => ({ Tenant: r.L.backend || 'free' }));"
+                  },
+                  "additionalConfiguration": {
+                    "title": "GPU Server 3",
+                    "donutId": "f7b292dd-09e5-5cf6-a04a-f7886695e71c",
+                    "hideTitle": false,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "tenant1",
+                        "color": "#2563eb",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant1"
+                      },
+                      {
+                        "label": "tenant2",
+                        "color": "#ea580c",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant2"
+                      },
+                      {
+                        "label": "free",
+                        "color": "#cbd5e1",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "free"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                },
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                    "queryType": "eql",
+                    "requestType": "get",
+                    "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu' && (r.L || {}).host === 'gpu-server-4').map(r => ({ Tenant: r.L.backend || 'free' }));"
+                  },
+                  "additionalConfiguration": {
+                    "title": "GPU Server 4",
+                    "donutId": "ce09119a-a304-55d6-a6af-d2b30cce457d",
+                    "hideTitle": false,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "tenant1",
+                        "color": "#2563eb",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant1"
+                      },
+                      {
+                        "label": "tenant2",
+                        "color": "#ea580c",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "tenant2"
+                      },
+                      {
+                        "label": "free",
+                        "color": "#cbd5e1",
+                        "field": "Tenant",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "free"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "uuid": "e2eada37-1aeb-5508-b01c-91a44dfb9cce",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletCount",
+              "uuid": "ac9b7050-ad03-5a54-ae41-7dce2fb3905b",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Tenant VPCs",
+              "subtitle": "One VirtualNetwork per tenant (DC1)",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.services_eda_nokia_com.v2.virtualnetwork fields [ name, status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "return data.filter(r => r.name !== 'internet' && r.name !== 'shared-services').map(r => ({ State: r.State }));"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Up",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Up"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Up"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletDataView",
+              "uuid": "7e946b8e-544d-5ddf-a874-dbaedc2efc8c",
+              "name": "",
+              "type": "dashletDataView",
+              "title": "Tenants",
+              "subtitle": "Per tenant VPC: switches it spans, attached ports, BGP sessions, anything down",
+              "width": 900,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "showStatusBar": true,
+              "showFilters": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.services_eda_nokia_com.v2.virtualnetwork fields [ name as \"Tenant VPC\", status.operationalState as \"State\", status.numNodes as \"Switches\", status.numSubinterfaces as \"Ports\", status.numSubinterfacesOperDown as \"Ports down\", status.numBGPPeers as \"BGP sessions\", status.numBGPPeersOperDown as \"BGP down\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "uuid": "d456b6bb-80cf-57cd-8f0c-badd02ec6584",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletCount",
+              "uuid": "753e1d4b-af27-52b2-b36e-9fbc681d1aa9",
+              "name": "",
+              "type": "dashletCount",
+              "title": "GPU backend fabric",
+              "subtitle": "Backend gpu-backend (EVPN, RoCEv2 QoS)",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.aifabrics_eda_nokia_com.v1.backend fields [ status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Up",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Up"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Up"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "4b7a682b-46b8-5e21-b0b2-abe20401fd2b",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Backend switches",
+              "subtitle": "8 rail leaves + 4 E/W spines connected and in sync",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.core_eda_nokia_com.v1.toponode fields [ metadata.labels as \"L\", status.node-state as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "return data.filter(r => (r.L || {}).fabric === 'backend').map(r => ({ State: r.State }));"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Synced",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Synced"
+                    },
+                    {
+                      "label": "Not synced",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Synced"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "1971c028-0f10-5119-8e55-62c71bef0aa6",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Backend links",
+              "subtitle": "Rail leaf <-> E/W spine (32 links, 800G)",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.fabrics_eda_nokia_com.v1.isl fields [ name, status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "return data.filter(r => (r.name || '').startsWith('isl-ew-spine-')).map(r => ({ State: r.State }));"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Up",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Up"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Up"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "d3217449-bf64-525a-8c46-0385c13a3bd7",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Backend BGP sessions",
+              "subtitle": "eBGP underlay + EVPN between rail leaves and spines",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.protocols_eda_nokia_com.v2.defaultbgppeer fields [ status.sessionState as \"Session\" ] where (.namespace.name = \"neocloud\" and spec.group = \"bgpgroup-ebgp-gpu-backend-spine\")",
+                  "queryType": "eql",
+                  "requestType": "get"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Established",
+                      "color": "#3bb34a",
+                      "field": "Session",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Established"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "Session",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Established"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "41cf55c1-c3ff-5d6b-8340-15a208ae5fe1",
+              "name": "",
+              "type": "dashletCount",
+              "title": "GPU NIC links",
+              "subtitle": "Every GPU's rail NIC (booked and free)",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.interfaces_eda_nokia_com.v1.interface fields [ metadata.labels as \"L\", status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "return data.filter(r => (r.L || {}).role === 'gpu').map(r => ({ State: r.State }));"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Up",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Up"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Up"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            }
+          ]
+        },
+        {
+          "uuid": "2ff47f43-b0dc-585e-8262-3f505bf193a4",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletLineChart",
+              "uuid": "0329282f-1812-50b7-bd5f-0dc59ec3d151",
+              "name": "",
+              "type": "dashletLineChart",
+              "title": "GPU traffic per rail",
+              "subtitle": "GPU ports of each rail leaf, both directions; draws while this page is open",
+              "width": 600,
+              "height": 350,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.node.srl.interface.traffic-rate fields [ .namespace.node.name as \"Key\", sum(in-bps) as \"In\", sum(out-bps) as \"Out\" ] where (.namespace.name = \"neocloud\" and (.namespace.node.name = \"rail-leaf-1\" or .namespace.node.name = \"rail-leaf-2\" or .namespace.node.name = \"rail-leaf-3\" or .namespace.node.name = \"rail-leaf-4\" or .namespace.node.name = \"rail-leaf-5\" or .namespace.node.name = \"rail-leaf-6\" or .namespace.node.name = \"rail-leaf-7\" or .namespace.node.name = \"rail-leaf-8\") and (.namespace.node.srl.interface.name = \"ethernet-1/1\" or .namespace.node.srl.interface.name = \"ethernet-1/2\" or .namespace.node.srl.interface.name = \"ethernet-1/3\" or .namespace.node.srl.interface.name = \"ethernet-1/4\")) sample milliseconds 2000",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "const o = {};\n[...data].sort((a, b) => a.Key.localeCompare(b.Key, undefined, { numeric: true })).forEach(r => { o[r.Key.replace('rail-leaf-', 'Rail ')] = (Number(r.In) || 0) + (Number(r.Out) || 0); });\nreturn [o];"
+                },
+                "additionalConfiguration": {
+                  "maxDataPoints": "150",
+                  "yAxisUnits": "bps",
+                  "scalingFunction": "metricPrefix"
+                }
+              }
+            },
+            {
+              "id": "dashletLineChart",
+              "uuid": "801aac6f-c539-5703-b217-f0d8983be58c",
+              "name": "",
+              "type": "dashletLineChart",
+              "title": "E/W spine load (ECMP spread)",
+              "subtitle": "Rail-facing ports of each E/W spine, both directions: even lines = traffic spread evenly over the 4 spines",
+              "width": 600,
+              "height": 350,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.node.srl.interface.traffic-rate fields [ .namespace.node.name as \"Key\", sum(in-bps) as \"In\", sum(out-bps) as \"Out\" ] where (.namespace.name = \"neocloud\" and (.namespace.node.name = \"ew-spine-1\" or .namespace.node.name = \"ew-spine-2\" or .namespace.node.name = \"ew-spine-3\" or .namespace.node.name = \"ew-spine-4\") and (.namespace.node.srl.interface.name = \"ethernet-1/1\" or .namespace.node.srl.interface.name = \"ethernet-1/2\" or .namespace.node.srl.interface.name = \"ethernet-1/3\" or .namespace.node.srl.interface.name = \"ethernet-1/4\" or .namespace.node.srl.interface.name = \"ethernet-1/5\" or .namespace.node.srl.interface.name = \"ethernet-1/6\" or .namespace.node.srl.interface.name = \"ethernet-1/7\" or .namespace.node.srl.interface.name = \"ethernet-1/8\")) sample milliseconds 2000",
+                  "queryType": "eql",
+                  "requestType": "get",
+                  "dataTransformer": "const o = {};\n[...data].sort((a, b) => a.Key.localeCompare(b.Key, undefined, { numeric: true })).forEach(r => { o[r.Key.replace('ew-spine-', 'Spine ')] = (Number(r.In) || 0) + (Number(r.Out) || 0); });\nreturn [o];"
+                },
+                "additionalConfiguration": {
+                  "maxDataPoints": "150",
+                  "yAxisUnits": "bps",
+                  "scalingFunction": "metricPrefix"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "uuid": "2db393a3-41b9-517c-ba41-394e7dc92d06",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletDataView",
+              "uuid": "84aca26b-f230-5f7f-977a-55227107d857",
+              "name": "",
+              "type": "dashletDataView",
+              "title": "GPU backend errors and discards",
+              "subtitle": "Rail leaves + E/W spines, ports with any non-zero counter since boot",
+              "width": 1000,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "showStatusBar": true,
+              "showFilters": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.node.srl.interface.statistics fields [ .namespace.node.name as \"Switch\", .namespace.node.srl.interface.name as \"Port\", in-discarded-packets as \"In discards\", out-discarded-packets as \"Out discards\", in-error-packets as \"In errors\", out-error-packets as \"Out errors\", in-fcs-error-packets as \"FCS errors\" ] where (.namespace.name = \"neocloud\" and (.namespace.node.name = \"rail-leaf-1\" or .namespace.node.name = \"rail-leaf-2\" or .namespace.node.name = \"rail-leaf-3\" or .namespace.node.name = \"rail-leaf-4\" or .namespace.node.name = \"rail-leaf-5\" or .namespace.node.name = \"rail-leaf-6\" or .namespace.node.name = \"rail-leaf-7\" or .namespace.node.name = \"rail-leaf-8\" or .namespace.node.name = \"ew-spine-1\" or .namespace.node.name = \"ew-spine-2\" or .namespace.node.name = \"ew-spine-3\" or .namespace.node.name = \"ew-spine-4\") and .namespace.node.srl.interface.name != \"mgmt0\" and (in-discarded-packets > 0 or out-discarded-packets > 0 or in-error-packets > 0 or out-error-packets > 0 or in-fcs-error-packets > 0)) order by [ in-discarded-packets descending ]",
+                  "queryType": "eql",
+                  "requestType": "get"
+                }
+              }
+            }
+          ]
+        },
+        {
+          "uuid": "1ede0c97-84c8-550c-84ed-a21e5cf35b2f",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletDataView",
+              "uuid": "980ad0b5-dbbb-5558-9b43-fd425738761c",
+              "name": "",
+              "type": "dashletDataView",
+              "title": "Tenant isolation: which routing table knows which subnet",
+              "subtitle": "Frontend: per VRF, the tenant / shared / firewall subnets it holds and on how many switches. A tenant VRF holds its own subnet + shared services (+ internet for tenant1), never another tenant's",
+              "width": 800,
+              "height": 400,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "showStatusBar": true,
+              "showFilters": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.node.srl.network-instance.route-table.ipv4-unicast.route fields [ .namespace.node.srl.network-instance.name as \"VRF\", ipv4-prefix as \"Subnet\", count(ipv4-prefix) as \"Switches\" ] where (.namespace.name = \"neocloud\" and .namespace.node.srl.network-instance.name != \"mgmt\" and .namespace.node.srl.network-instance.name != \"edge\" and (ipv4-prefix = \"100.100.100.0/24\" or ipv4-prefix = \"200.200.200.0/24\" or ipv4-prefix = \"10.10.10.0/24\" or ipv4-prefix = \"10.20.20.0/24\" or ipv4-prefix = \"203.0.113.128/26\" or ipv4-prefix = \"0.0.0.0/0\")) order by [ VRF ascending ]",
+                  "queryType": "eql",
+                  "requestType": "get"
+                }
+              }
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "4afadf26-7b6b-504c-ab96-b527dd37aaca",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Configuration drift",
+              "subtitle": "Switch config changed outside EDA (deviations)",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.core_eda_nokia_com.v1.deviation fields [ spec.nodeEndpoint as \"Switch\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Deviations",
+                      "color": "#c71e1e",
+                      "field": "Switch",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": ""
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            }
+          ]
+        },
+        {
+          "uuid": "dcb3892d-5b86-56f9-a422-6d613f0d64eb",
+          "name": "",
+          "type": "flexRow",
+          "flexDirection": "row",
+          "components": [
+            {
+              "id": "dashletDonutChart",
+              "uuid": "0c43fafe-0a41-5c20-9cfd-5c44f3bb77c6",
+              "name": "",
+              "type": "dashletDonutChart",
+              "title": "Active alarms by severity",
+              "subtitle": "Not cleared, not suppressed",
+              "width": 400,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "componentConfigurations": [
+                {
+                  "apiConfiguration": {
+                    "api": ".namespace.alarms.v1.alarm fields [ severity ] where (.namespace.name = \"neocloud\" and cleared = \"false\" and suppressed != \"true\")",
+                    "queryType": "eql",
+                    "requestType": "get"
+                  },
+                  "additionalConfiguration": {
+                    "title": "Active alarms",
+                    "donutId": "7eb2262b-148a-5d5f-87b8-9288d1c30fcd",
+                    "hideTitle": true,
+                    "showTotal": true,
+                    "children": [
+                      {
+                        "label": "Critical",
+                        "color": "#c71e1e",
+                        "field": "severity",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "critical"
+                      },
+                      {
+                        "label": "Major",
+                        "color": "#fc7319",
+                        "field": "severity",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "major"
+                      },
+                      {
+                        "label": "Minor",
+                        "color": "#ffac0a",
+                        "field": "severity",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "minor"
+                      },
+                      {
+                        "label": "Warning",
+                        "color": "#ffe12b",
+                        "field": "severity",
+                        "type": "string",
+                        "criteria": "equal",
+                        "value": "warning"
+                      }
+                    ],
+                    "thickness": 2,
+                    "animation": true,
+                    "sliceLabels": 0,
+                    "legendStyle": 2
+                  }
+                }
+              ]
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "b0cf3255-aa53-5137-afc1-12c4b16a0a76",
+              "name": "",
+              "type": "dashletCount",
+              "title": "All switches in sync",
+              "subtitle": "28 switches: frontend, GPU backend, border routers, DC2",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.core_eda_nokia_com.v1.toponode fields [ status.node-state as \"State\" ] where (.namespace.name = \"neocloud\")",
+                  "queryType": "eql",
+                  "requestType": "get"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Synced",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Synced"
+                    },
+                    {
+                      "label": "Not synced",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Synced"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletCount",
+              "uuid": "2290b9e1-1caa-5a87-92d1-439e62a657c7",
+              "name": "",
+              "type": "dashletCount",
+              "title": "Frontend fabrics",
+              "subtitle": "Fabric frontend (DC1) + Fabric dc2",
+              "width": 300,
+              "height": 200,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.resources.cr.fabrics_eda_nokia_com.v1.fabric fields [ status.operationalState as \"State\" ] where (.namespace.name = \"neocloud\" and (name = \"frontend\" or name = \"dc2\"))",
+                  "queryType": "eql",
+                  "requestType": "get"
+                },
+                "additionalConfiguration": {
+                  "children": [
+                    {
+                      "label": "Up",
+                      "color": "#3bb34a",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "equal",
+                      "value": "Up"
+                    },
+                    {
+                      "label": "Down",
+                      "color": "#c71e1e",
+                      "field": "State",
+                      "type": "string",
+                      "criteria": "not_equal",
+                      "value": "Up"
+                    }
+                  ]
+                }
+              },
+              "parentFlexType": "row",
+              "fillWidth": false,
+              "showTotal": false,
+              "totalLast": false,
+              "verticalList": false,
+              "showPercentage": false
+            },
+            {
+              "id": "dashletDataView",
+              "uuid": "56e8eb41-a176-52b4-ab8a-330196504193",
+              "name": "",
+              "type": "dashletDataView",
+              "title": "Switch software",
+              "subtitle": "Version and last boot per switch (upgrade progress shows here)",
+              "width": 700,
+              "height": 300,
+              "parentFlexType": "row",
+              "fillWidth": true,
+              "showStatusBar": true,
+              "showFilters": true,
+              "componentConfiguration": {
+                "apiConfiguration": {
+                  "api": ".namespace.node.srl.system.information fields [ .namespace.node.name as \"Switch\", version as \"Version\", last-booted as \"Last booted\" ] where (.namespace.name = \"neocloud\") order by [ last-booted descending ]",
+                  "queryType": "eql",
+                  "requestType": "get"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

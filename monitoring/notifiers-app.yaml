@@ -1,0 +1,16 @@
+# EDA notifiers app (CRDs Provider / Notifier / ClusterProvider / ClusterNotifier, notifiers.eda.nokia.com/v1):
+# sends alarms or EQL-query results to a shoutrrr URI (Slack, Teams, email, generic webhook …). Not in a fresh EDA
+# install ⇒ deploy.sh phase monitoring installs it when the CRD is missing; destroy.sh leaves it (cluster-wide app).
+# v7.0.1 = EDA 26.8.2 generation (catalog nokia-eda/catalog HEAD 2026-11-09).
+apiVersion: appstore.eda.nokia.com/v1
+kind: AppInstaller
+metadata:
+  generateName: neocloud-notifiers-install-
+  namespace: eda-system
+spec:
+  operation: install
+  apps:
+    - appId: notifiers.eda.nokia.com
+      catalog: eda-catalog-builtin-apps
+      version:
+        value: v7.0.1

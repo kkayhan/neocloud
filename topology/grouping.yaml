@@ -1,0 +1,18 @@
+# neocloud — tiers for EDA's topology view (Topologies → Physical → Grouping "neocloud tiers").
+# TopoNodes carry only the short `role` label (owner Q14 A), so Nokia's `eda-system/role` grouping puts
+# every switch on one row. EDA allows TopologyGrouping ONLY in eda-system (aifabric txn 840) => it is
+# cluster-wide; the name sorts after `aifabric-spine-leaf`, so the aifabric default view is unchanged.
+apiVersion: topologies.eda.nokia.com/v1
+kind: TopologyGrouping
+metadata:
+  name: neocloud-tiers
+  namespace: eda-system
+spec:
+  uiName: NeoCloud tiers
+  uiDescription: Border routers on top, spines, then leaves and border leaves.
+  tierSelectors:
+    - { nodeSelector: [ role=border-router ], tier: 1 }
+    - { nodeSelector: [ role=spine ], tier: 2 }
+    - { nodeSelector: [ role=borderleaf ], tier: 3 }
+    - { nodeSelector: [ role=leaf ], tier: 3 }
+    - { tier: 3 }

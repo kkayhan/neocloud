@@ -1,0 +1,40 @@
+# neocloud — SR Linux 26.7.2 for the fabric downgrade/upgrade scene (owner 2026-11-09 Q5: full-fabric 26.7.1 ⇄ 26.7.2
+# with DeployImagePipeline). EDA 26.8.2 seeds NodeProfiles only up to srlinux-ghcr-26.7.1 ⇒ own copy:
+#   Artifact srlinux-ghcr-26.7.2 (eda-system, repo schemaprofiles) = Nokia's published YANG schema profile
+#     github.com/nokia-eda/schema-profiles release nokia-srl-26.7.2 (asset srlinux-26.7.2-519.zip; release listed 2026-11-09)
+#   NodeProfile srlinux-ghcr-26.7.2 (ns neocloud) = the ns copy of srlinux-ghcr-26.7.1 with image/version/yang swapped;
+#     license neocloud-srl-sim-license (X1B: SRL_26_7_* scope covers 26.7.2). `images` MUST have an entry: the bootstrap
+#     Init intent reads images[0] (without it: "init-base … srl.py line 34 get_bootstrap_cfg IndexError", whole
+#     tranche rejected, 2026-11-09); on CX nothing downloads it (the swap = the sim pod's containerImage). No llmDb.
+apiVersion: artifacts.eda.nokia.com/v1
+kind: Artifact
+metadata: { name: srlinux-ghcr-26.7.2, namespace: eda-system }
+spec:
+  repo: schemaprofiles
+  filePath: srlinux-26.7.2.zip
+  checksumEnabled: false
+  remoteFileUrl:
+    fileUrl: https://github.com/nokia-eda/schema-profiles/releases/download/nokia-srl-26.7.2/srlinux-26.7.2-519.zip
+---
+apiVersion: core.eda.nokia.com/v1
+kind: NodeProfile
+metadata: { name: srlinux-ghcr-26.7.2, namespace: neocloud }
+spec:
+  annotate: false
+  containerImage: ghcr.io/nokia/srlinux:26.7.2-519
+  dhcp:
+    dhcp4Options: [ { option: 6-DomainNameServer, value: [ 128.251.10.125 ] } ]
+    managementPoolv4: ipv4-mgmt-pool
+  imagePullSecret: core
+  images: [ { image: _base_/srlimages/srlinux-26.7.2-519, imageMd5: _base_/srlimages/srlinux-26.7.2-519-md5 } ]
+  license: neocloud-srl-sim-license
+  nodeUser: admin
+  onboardingPassword: NokiaSrl1!
+  onboardingUsername: admin
+  operatingSystem: srl
+  platformPath: .platform.chassis.type
+  port: 57400
+  version: 26.7.2
+  versionMatch: v26\.7\.2.*
+  versionPath: .system.information.version
+  yang: https://eda-asvr.eda-system.svc/_base_/schemaprofiles/srlinux-ghcr-26.7.2/srlinux-26.7.2.zip

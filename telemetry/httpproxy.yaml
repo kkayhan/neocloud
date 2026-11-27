@@ -1,0 +1,14 @@
+# Publishes the neocloud Grafana under the EDA address:
+#   <EDA URL>/core/httpproxy/v1/neocloud-grafana/
+# Name MUST equal the last path element of GF_SERVER_ROOT_URL in stack.yaml
+# (else HTTP 200 + blank "failed to load its application files", telemetry-stack §21e).
+# Not "grafana" (microseg), "upgrade-grafana" (upgrade-pipeline) nor "aifabric-grafana" (aifabric): those demos own them.
+# atDestination = anonymous viewer access, same as the other demo Grafanas.
+apiVersion: core.eda.nokia.com/v1
+kind: HttpProxy
+metadata:
+  name: neocloud-grafana
+  namespace: eda-system
+spec:
+  authType: atDestination
+  rootUrl: http://grafana.neocloud.svc.cluster.local:3000/

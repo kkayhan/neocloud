@@ -1,0 +1,32 @@
+# neocloud — MACsec on the 2 DCI links (border-leaf-N e1-5 <-> dc2-border-leaf-N e1-5), both ends = the 4 X1B
+# border leaves (role=borderleaf; only X1B has the `macsec` feature, plan.md § FACTS).
+# Owner Q4 B 2026-11-02: config PRESENT, MACsec ADMIN-DISABLED from the start. WHY: on the CX sim an enabled
+# MACsec port stops forwarding (arx 2026-07-08, X1B 26.3.2: MKA never up, DCI ISLs Degraded) ⇒ the lab shows
+# the complete real-hardware config while the DCI keeps working. To show it "on": set the two
+# `transport-security macsec interface` entries to admin-state enable on real hardware only.
+# SR Linux 26.7.1 renamed `rx-must-be-encrypted` (26.3) → `rx-must-be-macsec-enabled` (MEASURED 2026-11-02: the old
+# name fails validate "Schema '/transport-security/macsec/interface' has no local leaf with the name
+# 'rx-must-be-encrypted'" and BLOCKS the node's version change, txn 1234/1235); rest of the model unchanged.
+# WHY a Configlet: EDA 26.8.2 has no MACsec CRD (plan.md § FACTS); SR Linux models it (srl_nokia-macsec).
+# Keys: deploy.sh phase macsec renders this template with a CAK (64 hex) + CKN (64 hex) generated ONCE per lab
+# into Secret neocloud/neocloud-macsec-keys (lab-only demo keys, never committed). Cipher gcm-aes-xpn-256 (owner
+# default Q4 B: XPN = extended packet numbering, the right choice for 100G+ links).
+apiVersion: config.eda.nokia.com/v1
+kind: Configlet
+metadata:
+  name: dci-macsec
+  namespace: neocloud
+spec:
+  operatingSystem: srl
+  endpointSelectors: [ role=borderleaf ]
+  priority: 10
+  configs:
+    - path: .system.authentication.keychain{.name=="dci-mka-kc"}
+      operation: Create
+      config: '{"name":"dci-mka-kc","admin-state":"enable","type":"macsec","key":[{"index":0,"algorithm":"aes-256-cmac","send-lifetime":{"start-time":"2026-01-01T00:00:00Z"},"macsec":{"admin-state":"enable","cak":"${CAK}","key-name":"${CKN}"}}]}'
+    - path: .transport-security.macsec.mka.policy{.name=="dci-mka"}
+      operation: Create
+      config: '{"name":"dci-mka","macsec-cipher-suite":"gcm-aes-xpn-256"}'
+    - path: .transport-security.macsec.interface{.name=="dci-e1-5"}
+      operation: Create
+      config: '{"name":"dci-e1-5","admin-state":"disable","rx-must-be-macsec-enabled":true,"interface-ref":{"interface":"ethernet-1/5"},"mka":{"mka-policy":"dci-mka","key-chain":"dci-mka-kc"}}'

@@ -1,0 +1,59 @@
+# neocloud — the tenant's OWN objects (one subnet VPC + its route-leaking policies), camelCase = EDA / GUI form.
+# ONE source for both onboarding paths (owner 2026-11-12): Terraform renders it with templatefile(), render-gui.py renders
+# the same text into gui/tenant2*.yaml. Template syntax used: dollar-brace variables + if/else/endif directives only
+# (render-gui.py implements exactly that subset).
+# The edits to SHARED objects (Backend group, shared-services + internet import, internet-public, GPU labels) are not in
+# here: Terraform sends them as JSON patches, the GUI files show the full edited objects (render-gui.py).
+#   vars: tenant (tenant2) · subnet (200.200.200.0/24) · prefix_len (24) · gateway (200.200.200.1/24) · vlan (102) ·
+#         internet (true | false)
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: PrefixSet
+metadata: { name: ${tenant}-subnet, namespace: neocloud }
+spec: { prefixes: [ { prefix: ${subnet}, startRange: ${prefix_len}, endRange: 32 } ] }
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-${tenant}-export, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements: [ { name: ${tenant}, match: { prefixSet: ${tenant}-subnet }, action: { policyResult: Accept } } ]
+---
+apiVersion: routingpolicies.eda.nokia.com/v1
+kind: Policy
+metadata: { name: leak-${tenant}-import, namespace: neocloud }
+spec:
+  defaultAction: { policyResult: Reject }
+  statements:
+    - { name: shared-services, match: { prefixSet: shared-services-subnet }, action: { policyResult: Accept } }
+%{ if internet ~}
+    - { name: internet-default, match: { prefixSet: default-route }, action: { policyResult: Accept } }
+%{ endif ~}
+---
+apiVersion: services.eda.nokia.com/v2
+kind: VirtualNetwork
+metadata: { name: ${tenant}, namespace: neocloud }
+spec:
+  routers:
+    - name: ${tenant}-vrf
+      spec:
+        type: EVPNVXLAN
+        description: "VPC ${tenant} (DC1)%{ if internet }, internet via the DC1 border leaves%{ endif }"
+%{ if internet ~}
+        nodeSelectors: [ "fabric=frontend,role=leaf", "fabric=frontend,role=borderleaf" ]
+%{ else ~}
+        nodeSelectors: [ "fabric=frontend,role=leaf" ]
+%{ endif ~}
+        routeLeaking: { exportPolicy: leak-${tenant}-export, importPolicy: leak-${tenant}-import }
+  bridgeDomains:
+    - { name: ${tenant}-bd, spec: { type: EVPNVXLAN, description: "${tenant} ${subnet}" } }
+  irbInterfaces:
+    - name: ${tenant}-irb
+      spec:
+        router: ${tenant}-vrf
+        bridgeDomain: ${tenant}-bd
+        ipAddresses: [ { ipv4Address: { ipPrefix: ${gateway}, primary: true, anycast: true } } ]
+        ipv4: { learnUnsolicitedARP: Enabled }
+        evpnRouteAdvertisementType: { arpDynamic: true, ndDynamic: true }
+        hostRoutePopulate: { dynamic: { populate: true, datapathProgramming: true } }
+  vlans:
+    - { name: ${tenant}-vlan${vlan}, spec: { bridgeDomain: ${tenant}-bd, vlanID: "${vlan}", interfaceSelectors: [ "frontend=tenant-trunk" ] } }

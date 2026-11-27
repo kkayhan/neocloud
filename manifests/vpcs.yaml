@@ -1,0 +1,98 @@
+# neocloud — tenant VPCs (ONE subnet each, no overlap) + a shared-services VPC, joined only by route leaking.
+# REDESIGN 2026-11-12 (owner): one subnet per tenant ("let's give them a single subnet for simplicity"), easy-to-read
+# blocks (tenant1 100.100.100.0/24, tenant2 200.200.200.0/24), tenant1 = internet via leaking (no BGP to the
+# border routers), tenant2 = no internet, both reach shared-services, never each other, PE-CE removed.
+# History: 2026-11-02 two VPCs with unique subnets; 2026-11-09 overlapping 10.101/24 + firewall subnet 10.103 +
+# peering subnets 10.111/10.112 + PE-CE + per-tenant internet exit on VLAN 11/12; all replaced 2026-11-12.
+#
+#   VPC              subnet             VLAN  hosts                                                           internet
+#   tenant1         100.100.100.0/24   101   GPUs booked by tenant1: .(100 + 10*server + gpu)                  yes
+#                                             (fw-1 + dc2-host-1 left the tenant 2026-11-16: fw-1 = VRF internet, edge.yaml)
+#   tenant2         200.200.200.0/24   102   NOT IN THE BASELINE (owner 2026-11-12): onboarded live by the demo, by hand in
+#                                             the GUI or by Terraform = tenant-onboarding/ (gui/*.yaml, terraform/); the GPU
+#                                             server trunks are pre-cabled (label frontend=tenant-trunk)
+#   shared-services  ONE ip-vrf, 2 subnets (owner 2026-11-12: storage = generic shared resource, not per tenant):
+#                    10.10.10.0/24      110   storage-1 .11 (leaf-3/4) · storage-2 .12 (leaf-5/6)            no
+#                    10.20.20.0/24      111   shared-service .10 (svc-leaf-1/2) · shared-service-2 .11 (DC2)  no
+#   History: until 2026-11-12 storage-1/-2 sat in tenant1/-b, storage-3 alone in shared 10.110.0.0/24, compute-1..3 in
+#   the tenants (all removed by the owner; plan.md § SHARED STORAGE).
+#   Who reaches what + how the leaking works = manifests/leaking.yaml (Router.spec.routeLeaking below).
+#
+# DCI = ONE STRETCHED EVPN DOMAIN (owner 2026-11-12: "change the design to One stretched EVPN domain across both DCs").
+# Fabric frontend owns the two DCI ISLs (fabricSelectors site=dc2, fabrics.yaml) and runs eBGP + eBGP EVPN on them
+# like on every ISL ⇒ the overlay spans DC1 + DC2 with no gateway in between. Each VPC = ONE Router + ONE
+# BridgeDomain + ONE anycast gateway (.1, default MAC) per subnet, placed by nodeSelectors.
+# TENANTS = DC1 ONLY since 2026-11-16 (owner Q1 A: "we don't have any tenant device on dc2 anymore"; was + fabric=dc2):
+# tenant1 = DC1 leaves + DC1 border leaves (leak with VRF internet), tenant2 = DC1 leaves (+ DC1 border leaves in its
+# internet variant). DC2 holds only shared-services (shared-service-2); it reaches the tenants through the RT-5 copies
+# of their subnets that the DC1 leaves advertise in the shared-services VRF (leaked locally there, re-advertised; VNI of
+# shared-services-vrf, measured 2026-11-16) ⇒ no tenant VRF needed on the DC2 border leaves.
+# Supersedes the 2026-11-10 → 11-12 VXLAN-to-VXLAN hairpin hand-off (three EVPN domains per tenant joined by cables
+# on each border leaf; last in git 1f43b12, rationale plan.md § CO-DESIGN ROUND 6).
+# shared-services = DC1 leaves (incl. the svc-leaves: shared-service host) + the DC2 border leaves (shared-service-2, stretched
+# over the DCI since 2026-11-16, owner Q1 A). A VirtualNetwork is only a container (dry-run txn 971).
+# Attachments follow Interface labels (list = OR, comma = AND): frontend=<storage|shared-service> on the host's LAG (both
+# DCs); GPU servers carry frontend=tenant-trunk (trunk of every tenant VLAN; each GPU VM picks its tenant's VLAN, hosts.sh).
+# Tenant VLANs select ONLY frontend=tenant-trunk since 2026-11-16 (owner Q3 A: no plain tenant host left; was + frontend=<tenant>).
+# IRB settings per eda-lab: learn unsolicited ARP + advertise dynamic ARP/ND + populate dynamic host routes WITH
+# datapath programming (needed by the leaking: host routes leak, not only the subnet); hostRoutePopulate.evpn OFF.
+# ---------- VPC tenant1: internet via the DC1 border leaves ----------
+apiVersion: services.eda.nokia.com/v2
+kind: VirtualNetwork
+metadata: { name: tenant1, namespace: neocloud }
+spec:
+  routers:
+    - name: tenant1-vrf
+      spec:
+        type: EVPNVXLAN
+        description: "VPC tenant1 (DC1)"
+        nodeSelectors: [ "fabric=frontend,role=leaf", "fabric=frontend,role=borderleaf" ]   # DC1 border leaves: leak with VRF internet (edge.yaml); no DC2 (2026-11-16)
+        routeLeaking: { exportPolicy: leak-tenant1-export, importPolicy: leak-tenant1-import }
+  bridgeDomains:
+    - { name: tenant1-bd, spec: { type: EVPNVXLAN, description: "tenant1 100.100.100.0/24" } }
+  irbInterfaces:
+    - name: tenant1-irb
+      spec:
+        router: tenant1-vrf
+        bridgeDomain: tenant1-bd
+        ipAddresses: [ { ipv4Address: { ipPrefix: 100.100.100.1/24, primary: true, anycast: true } } ]
+        ipv4: { learnUnsolicitedARP: Enabled }
+        evpnRouteAdvertisementType: { arpDynamic: true, ndDynamic: true }
+        hostRoutePopulate: { dynamic: { populate: true, datapathProgramming: true } }
+  vlans:
+    - { name: tenant1-vlan101, spec: { bridgeDomain: tenant1-bd, vlanID: "101", interfaceSelectors: [ "frontend=tenant-trunk" ] } }
+---
+apiVersion: services.eda.nokia.com/v2
+kind: VirtualNetwork
+metadata: { name: shared-services, namespace: neocloud }
+spec:
+  routers:
+    - name: shared-services-vrf
+      spec:
+        type: EVPNVXLAN
+        description: "VPC shared-services (DC1 + DC2): storage + shared-service subnets in one ip-vrf, reached by tenant1 and tenant2 via route leaking"
+        nodeSelectors: [ "fabric=frontend,role=leaf", "fabric=dc2" ]
+        routeLeaking: { exportPolicy: leak-shared-export, importPolicy: leak-shared-import }
+  bridgeDomains:
+    - { name: storage-bd, spec: { type: EVPNVXLAN, description: "shared storage 10.10.10.0/24" } }
+    - { name: shared-service-bd, spec: { type: EVPNVXLAN, description: "shared service 10.20.20.0/24, stretched DC1 + DC2" } }
+  irbInterfaces:
+    - name: storage-irb
+      spec:
+        router: shared-services-vrf
+        bridgeDomain: storage-bd
+        ipAddresses: [ { ipv4Address: { ipPrefix: 10.10.10.1/24, primary: true, anycast: true } } ]
+        ipv4: { learnUnsolicitedARP: Enabled }
+        evpnRouteAdvertisementType: { arpDynamic: true, ndDynamic: true }
+        hostRoutePopulate: { dynamic: { populate: true, datapathProgramming: true } }
+    - name: shared-service-irb
+      spec:
+        router: shared-services-vrf
+        bridgeDomain: shared-service-bd
+        ipAddresses: [ { ipv4Address: { ipPrefix: 10.20.20.1/24, primary: true, anycast: true } } ]
+        ipv4: { learnUnsolicitedARP: Enabled }
+        evpnRouteAdvertisementType: { arpDynamic: true, ndDynamic: true }
+        hostRoutePopulate: { dynamic: { populate: true, datapathProgramming: true } }
+  vlans:
+    - { name: storage-vlan110, spec: { bridgeDomain: storage-bd, vlanID: "110", interfaceSelectors: [ "frontend=storage" ] } }
+    - { name: shared-service-vlan111, spec: { bridgeDomain: shared-service-bd, vlanID: "111", interfaceSelectors: [ "frontend=shared-service" ] } }

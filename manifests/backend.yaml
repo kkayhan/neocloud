@@ -1,0 +1,47 @@
+# neocloud — GPU backend = ONE aifabrics Backend (owner: "for backend fabric we use backend CR").
+#   stripe gpu-backend-leaves (owner rename 2026-11-10; was rails)   rail-leaf-1..8 (one stripe = the 8 rails of the 4 GPU servers; rail-leaf-1/2 also
+#                      carried storage-1..3 until the owner removed it 2026-11-02 — storage = frontend only)
+#   stripeConnector    ew-spine-1..4 over the 32 backend ISLs (TopoLinks role=interSwitch,fabric=backend;
+#                      spine = local end, else the txn fails — aifabric)
+#   overlay EVPN       owner Q6 B: one EVPN-VXLAN ip-vrf per tenant, no DLB (the CRD has no off value ⇒ the
+#                      dynamicLoadBalancing block is simply left out). Cost (aifabric, measured): ISL ip-mtu =
+#                      ipMTU + 36 = 4236 ⇒ cross-rail IP packets of 4187-4200 B dropped; RoCEv2 4096 fits.
+#   tenants            PER GPU (owner 2026-11-02 "multitenancy at GPU/NIC level similar to aifabric ... use labels";
+#                      was per server, Q8 B): gpuIsolationGroups = Interface label backend=tenant1|tenant2 on each GPU's rail
+#                      NIC (role=gpu, Interface rail-leaf-<G>-ethernet-1-<S> = GPU G of gpu-server-S); no backend label
+#                      = free GPU, parked port (owner R3 A). Baseline (gen-topology.py BASELINE, owner 2026-11-12): server 1
+#                      aaaaaaaa, 2 aaaa----, 3 + 4 free = 20 free GPUs for the tenant2 onboarding demo. Booking = relabel the Interface (the Backend re-evaluates
+#                      live), then hosts.sh moves the GPU's host side (or hosts.sh --follow does it).
+#   addressing         EDAManagedIPv6: one /64 per rail port, leaf ::1, host NIC ::2 (hosts.sh reads them from EDA).
+apiVersion: aifabrics.eda.nokia.com/v1
+kind: Backend
+metadata:
+  name: gpu-backend
+  namespace: neocloud
+spec:
+  type:
+    overlay: EVPN
+  asnPool: asn-pool
+  systemPoolIPv4: systemipv4-pool
+  ipMTU: 4200
+  addressAllocation:
+    type: EDAManagedIPv6
+    edaManagedIPv6:
+      leafIndexPoolScope: Global
+      prefixLength: "64"
+  stripes:
+    - { name: gpu-backend-leaves, stripeID: 1, gpuVLAN: 1, nodeSelectors: [ "fabric=backend,role=leaf" ] }
+  stripeConnector:
+    name: gpu-backend-spine
+    nodeSelectors: [ "fabric=backend,role=spine" ]
+    linkSelectors: [ "role=interSwitch,fabric=backend" ]
+  gpuIsolationGroups:
+    - { name: tenant1, interfaceSelectors: [ "role=gpu,backend=tenant1" ] }
+    # tenant2 group is ADDED by its onboarding (tenant-onboarding/, owner Q4 B 2026-11-12)
+  rocev2QoS:
+    ecnSlopeMinThresholdPercent: 5
+    ecnSlopeMaxThresholdPercent: 80
+    ecnMaxDropProbabilityPercent: 100
+    pfcDeadlockDetectionTimerMs: 750
+    pfcDeadlockRecoveryTimerMs: 750
+    queueMaximumBurstSizeBytes: 1024000

@@ -1,0 +1,19 @@
+# neocloud Prometheus: scrapes EDA's own exporter (one endpoint). exports.yaml already limits it to
+# namespace neocloud; keep only what the topology draws (port rate + port oper-state + Interface CRs = GPU tenants).
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: eda-exporter
+    static_configs:
+      - targets: ['eda-api.eda-system.svc']
+    metrics_path: /core/httpproxy/v1/prometheus-exporter/metrics
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+    metric_relabel_configs:
+      - source_labels: [__name__, namespace_name]
+        regex: (node_srl_interface_(traffic_rate_(in|out)_bps|oper_state)|namespace_resources_cr_interfaces_eda_nokia_com_v1_interface);neocloud
+        action: keep
+# GOTCHA (telemetry-stack §23): the exporter omits a given node from ~1 in 3 scrapes
+# => the dashboard queries use last_over_time(...[20s]).

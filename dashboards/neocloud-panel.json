@@ -1,0 +1,32 @@
+{
+  "categories": [
+    {
+      "categoryName": "NeoCloud",
+      "icon": "Dashboard",
+      "apps": [
+        {"name": "NeoCloud Operations", "uiLabel": "NeoCloud Operations", "uiCategory": "NeoCloud", "navTarget": {"edaRoute": "dashboards", "targetReference": {"name": "NeoCloud Operations", "fileName": "neocloud-ops.json", "type": "shared", "source": "User Storage"}}},
+        {"name": "live-topology", "uiLabel": "Live Topology (Grafana)", "uiCategory": "NeoCloud", "navTarget": {"edaRoute": "external", "useNewTab": true, "targetReference": "/core/httpproxy/v1/neocloud-grafana/d/neocloud-topology/"}},
+        {"name": "transactions", "navTarget": {"edaRoute": "transactions"}, "uiPanel": "main", "uiCategory": "NeoCloud", "access": {"type": "none"}, "uiLabel": "Transactions"},
+        {"name": "merge-requests", "navTarget": {"edaRoute": "merge-requests"}, "uiPanel": "main", "uiCategory": "NeoCloud", "access": {"type": "table", "path": ".cluster.config-engine.v1.merge-request", "namespaced": true}, "uiLabel": "Merge Requests"}
+      ]
+    },
+    {
+      "categoryName": "Network",
+      "apps": [
+        {"name": "fabrics", "plural": "fabrics", "uiCategory": "Network", "uiLabel": "Fabrics", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "fabrics.eda.nokia.com/v1/fabrics"}, "uiIcon": "SiteMap"},
+        {"name": "backends", "plural": "backends", "uiCategory": "Network", "uiLabel": "AI Backends", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "aifabrics.eda.nokia.com/v1/backends"}, "uiIcon": "AiIcon"},
+        {"name": "virtualnetworks", "plural": "virtualnetworks", "uiCategory": "Network", "uiLabel": "Virtual Networks", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "services.eda.nokia.com/v2/virtualnetworks"}, "uiIcon": "Service"},
+        {"name": "policys", "plural": "policys", "uiCategory": "Network", "uiLabel": "Routing Policies", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "routingpolicies.eda.nokia.com/v1/policys"}, "uiIcon": "Policy"},
+        {"name": "prefixsets", "plural": "prefixsets", "uiCategory": "Network", "uiLabel": "Prefix Sets", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "routingpolicies.eda.nokia.com/v1/prefixsets"}, "uiIcon": "Ipoe"},
+        {"name": "interfaces", "plural": "interfaces", "uiCategory": "Network", "uiLabel": "Interfaces", "uiPanel": "main", "navTarget": {"edaRoute": "resources", "targetReference": "interfaces.eda.nokia.com/v1/interfaces"}, "uiIcon": "LinkAggregation"}
+      ]
+    },
+    {
+      "categoryName": "Operations",
+      "apps": [
+        {"name": "alarms", "navTarget": {"edaRoute": "alarms"}, "uiPanel": "main", "uiCategory": "Operations", "access": {"type": "table", "path": ".namespace.alarms.v1.alarm", "namespaced": true}, "uiLabel": "Alarms"},
+        {"name": "topologies", "navTarget": {"edaRoute": "topologies"}, "uiPanel": "main", "uiCategory": "Operations", "access": {"type": "url", "path": "/core/topology/v1"}, "uiLabel": "Topologies"}
+      ]
+    }
+  ]
+}

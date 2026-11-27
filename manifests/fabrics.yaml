@@ -1,0 +1,54 @@
+# neocloud — the two Fabric CRs (owner Q5 A 2026-11-02: eBGP unnumbered IPv6 underlay + eBGP EVPN on the same
+# per-link sessions, same style as the Backend).
+#
+#   frontend (DC1)  ns-spine-1/2 (spines, ONE shared ASN — spines never peer each other)
+#                   svc-leaf-1/2 + leaf-3..8 (leafs) · border-leaf-1/2 (borderLeafs: per-node ASN)
+#                   20 ISLs + the 2 DCI links. WHY the DCI links here: an ISL needs both ends in this Fabric or
+#                   in a Fabric it selects (fabricSelectors), and the TopoLink LOCAL end must belong to the
+#                   selecting Fabric (eda-lab § Fabric CR) ⇒ DCI local end = DC1 border leaf ⇒ frontend owns
+#                   both DCI links via fabricSelectors site=dc2 (Fabric dc2's label; frontend needs none, 2026-11-16).
+#   dc2 (DC2)       dc2-border-leaf-1/2 (borderLeafs) + their 1 ISL.
+# Selector lists = OR, a comma inside one string = AND. `fabric=…` keeps the Backend's switches (also role
+# spine/leaf) out. Pools: the namespace's asn-pool (patched to 4200000100+ by deploy.sh phase ns) and
+# systemipv4-pool, shared with the Backend (each allocation is unique).
+# Inter-DC EVPN: the DCI ISLs carry EVPN like every other ISL; what crosses the DCI is decided by the
+# services (manifests/vpcs.yaml: one Router + BridgeDomain per tenant over both DCs since 2026-11-12), not here.
+apiVersion: fabrics.eda.nokia.com/v1
+kind: Fabric
+metadata:
+  name: frontend
+  namespace: neocloud
+spec:
+  systemPoolIPv4: systemipv4-pool
+  spines: { spineNodeSelectors: [ "fabric=frontend,role=spine" ] }
+  leafs: { leafNodeSelectors: [ "fabric=frontend,role=leaf" ] }
+  borderLeafs: { borderLeafNodeSelectors: [ "fabric=frontend,role=borderleaf" ] }
+  fabricSelectors: [ site=dc2 ]
+  interSwitchLinks:
+    linkSelectors: [ "role=interSwitch,fabric=frontend", "role=interSwitch,fabric=dci" ]
+    unnumbered: IPv6
+    ipMTU: 9000
+  underlayProtocol:
+    protocols: [ EBGP ]
+    bgp: { asnPool: asn-pool }
+  overlayProtocol:
+    protocol: EBGP
+---
+apiVersion: fabrics.eda.nokia.com/v1
+kind: Fabric
+metadata:
+  name: dc2
+  namespace: neocloud
+  labels: { site: dc2 }
+spec:
+  systemPoolIPv4: systemipv4-pool
+  borderLeafs: { borderLeafNodeSelectors: [ "fabric=dc2,role=borderleaf" ] }
+  interSwitchLinks:
+    linkSelectors: [ "role=interSwitch,fabric=dc2" ]
+    unnumbered: IPv6
+    ipMTU: 9000
+  underlayProtocol:
+    protocols: [ EBGP ]
+    bgp: { asnPool: asn-pool }
+  overlayProtocol:
+    protocol: EBGP

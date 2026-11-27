@@ -1,0 +1,12 @@
+# per-machine state written by deploy.sh: the saved connection (no password), the kubectl wrapper, deploy logs
+.state/
+__pycache__/
+# generated at deploy time from the target EDA's own Deploy Image pipeline (upgrade/build-pipeline.py)
+upgrade/pipeline.yaml
+# Terraform (tenant-onboarding/): provider cache, state, the generated variables, saved plans, generated brownfield HCL
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+*.tfplan
+tenant-onboarding/brownfield/tenant1.tf
